@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel de Chamada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=IBM+Plex+Mono:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* layout: horizontal conveyor track with status nodes, live summary strip above, detail cards + legend below — built dark-first for a wall-mounted shop-floor monitor */
+    --bg: #0B0E13;
+    --surface: #121720;
+    --surface-2: #1A212C;
+    --border: #242C38;
+    --fg: #ECF1F6;
+    --muted: #8A96A6;
+    --accent: #4C8DFF;
+    --track: #2A3340;
+
+    --ok: #2FBE6B;
+    --warn: #E8B93A;
+    --crit: #F2843B;
+    --down: #EF4659;
+
+    --font-display: 'Archivo', 'Arial Narrow', sans-serif;
+    --font-body: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'IBM Plex Mono', 'Courier New', monospace;
+
+    color-scheme: dark;
+  }
+
+  @media (prefers-color-scheme: light){
+    :root:not([data-theme="dark"]){
+      --bg: #F2F4F7;
+      --surface: #FFFFFF;
+      --surface-2: #ECEFF3;
+      --border: #D7DCE3;
+      --fg: #11161D;
+      --muted: #5B6675;
+      --accent: #2A63E0;
+      --track: #CBD2DB;
+
+      --ok: #1C9955;
+      --warn: #AD7E05;
+      --crit: #C85F1D;
+      --down: #CE2B3E;
+      color-scheme: light;
+    }
+  }
+  :root[data-theme="light"]{
+    --bg: #F2F4F7;
+    --surface: #FFFFFF;
+    --surface-2: #ECEFF3;
+    --border: #D7DCE3;
+    --fg: #11161D;
+    --muted: #5B6675;
+    --accent: #2A63E0;
+    --track: #CBD2DB;
+
+    --ok: #1C9955;
+    --warn: #AD7E05;
+    --crit: #C85F1D;
+    --down: #CE2B3E;
+    color-scheme: light;
+  }
+
+  *{ box-sizing: border-box; }
+  body{
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    padding-inline: max(16px, env(safe-area-inset-left, 0px));
+    padding-block: 20px 32px;
+  }
+  .mono{ font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+  .wrap{ max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
+
+  /* ---- header ---- */
+  .topbar{
+    display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap;
+    border-bottom: 1px solid var(--border); padding-bottom: 16px;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    width:38px; height:38px; border-radius:10px; flex:none;
+    background: linear-gradient(145deg, var(--accent), #2545a0);
+    display:flex; align-items:center; justify-content:center;
+    font-family: var(--font-display); font-weight:800; color:#fff; font-size:15px;
+  }
+  h1{ font-family: var(--font-display); font-weight:800; font-size: clamp(20px, 3vw, 26px); margin:0; letter-spacing:-0.01em; text-wrap: balance; }
+  .subtitle{ margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+  .proto-badge{
+    display:inline-flex; align-items:center; gap:6px; margin-left:10px;
+    padding: 2px 8px; border-radius: 999px; border:1px solid var(--border);
+    font-size: 11px; color: var(--muted); font-family: var(--font-mono); letter-spacing:.03em; vertical-align:middle;
+  }
+
+  .status-clock{ display:flex; align-items:center; gap:10px; color: var(--muted); font-size: 13px; }
+  #clock{ font-size: 18px; color: var(--fg); font-weight:600; }
+  .pulse-dot{
+    width:9px; height:9px; border-radius:50%; background: var(--ok);
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent);
+    animation: heartbeat 2.4s ease-in-out infinite;
+  }
+  @keyframes heartbeat{
+    0%,100%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--ok) 45%, transparent); }
+    50%{ box-shadow: 0 0 0 7px color-mix(in srgb, var(--ok) 0%, transparent); }
+  }
+
+  /* ---- production context (linha / modelo / versão em produção agora) ---- */
+  .run-context{
+    background: var(--surface); border:1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius:14px; padding: 16px 22px; display:flex; align-items:center; gap:30px; flex-wrap:wrap;
+  }
+  .run-field{ display:flex; flex-direction:column; gap:4px; }
+  .run-label{ font-size:11px; letter-spacing:.07em; text-transform:uppercase; color: var(--muted); font-weight:700; }
+  .run-value{ font-family: var(--font-display); font-weight:800; font-size:clamp(22px,3.4vw,32px); letter-spacing:-0.01em; line-height:1; }
+  .run-divider{ width:1px; height:36px; background: var(--border); flex:none; }
+  .select-wrap{ position:relative; display:inline-flex; align-items:center; }
+  .run-select{
+    font-family: var(--font-display); font-weight:800; font-size:clamp(20px,3vw,28px); line-height:1;
+    background:transparent; border:none; color: var(--fg); cursor:pointer; letter-spacing:-0.01em;
+    padding:0 20px 0 0; appearance:none; -webkit-appearance:none;
+  }
+  .run-select:focus-visible{ outline:2px solid var(--accent); outline-offset:4px; border-radius:4px; }
+  .select-wrap::after{
+    content:'▾'; position:absolute; right:0; font-size:13px; color: var(--muted); pointer-events:none;
+  }
+  .run-input{
+    font-family: var(--font-mono); font-weight:700; font-size:clamp(18px,2.6vw,25px); line-height:1;
+    background:transparent; border:none; border-bottom:2px solid var(--border); color: var(--fg);
+    letter-spacing:-0.01em; padding:0 2px 3px; max-width:100%;
+  }
+  .run-input::placeholder{ color: var(--muted); opacity:.45; font-weight:600; }
+  .run-input:focus{ outline:none; border-bottom-color: var(--accent); }
+  #ordemInput{ width:12ch; }
+  #qtdOrdemInput{ width:6ch; }
+
+  /* ---- summary chips ---- */
+  .summary{ display:flex; gap:10px; flex-wrap:wrap; }
+  .chip{
+    display:flex; align-items:center; gap:8px;
+    background: var(--surface); border:1px solid var(--border); border-radius:10px;
+    padding: 10px 14px; min-width: 128px;
+  }
+  .chip .dot{ width:10px; height:10px; border-radius:50%; flex:none; }
+  .chip .num{ font-family: var(--font-mono); font-size:20px; font-weight:600; line-height:1; }
+  .chip .lbl{ font-size:12px; color: var(--muted); }
+
+  /* ---- line visualization ---- */
+  .panel{
+    background: var(--surface); border:1px solid var(--border); border-radius:14px; padding: 20px;
+  }
+  .panel-head{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
+  .panel-title{ font-family: var(--font-display); font-weight:700; font-size:15px; letter-spacing:.01em; }
+  .panel-hint{ font-size:12px; color: var(--muted); }
+
+  .line-scroll{ overflow-x:auto; padding-bottom: 6px; }
+  .line-track{ display:inline-flex; align-items:flex-start; min-width: max-content; padding: 6px 2px 0; }
+  .node-wrap{ display:flex; flex-direction:column; align-items:center; width: 108px; flex:none; }
+  .connector{ height:2px; width:46px; background: var(--track); margin-top:27px; flex:none; }
+
+  .node{
+    width:62px; height:62px; border-radius:50%; border: none; cursor:pointer;
+    font-family: var(--font-mono); font-weight:700; font-size:12.5px; color:#0B0E13;
+    letter-spacing:-0.02em;
+    display:flex; align-items:center; justify-content:center;
+    position:relative; transition: transform .12s ease;
+  }
+  .node:hover{ transform: translateY(-2px); }
+  .node:focus-visible{ outline: 2px solid var(--accent); outline-offset: 3px; }
+  .node-caption{ margin-top:10px; text-align:center; display:flex; flex-direction:column; gap:3px; }
+  .node-caption strong{ font-size:12px; font-weight:600; line-height:1.25; }
+  .node-caption .mono{ font-size:10.5px; color: var(--muted); }
+  .node-caption .qty-target{
+    margin-top:2px; font-size:10.5px; font-weight:700; color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    border-radius:6px; padding:2px 7px; display:inline-block;
+  }
+
+  .status-normal{ background: var(--ok); }
+  .status-atencao{ background: var(--warn); }
+  .status-critico{ background: var(--crit); }
+  .status-parado{ background: var(--down); }
+
+  .node-ring{
+    position:absolute; inset:-5px; border-radius:50%; border:2px solid transparent; pointer-events:none;
+  }
+  .status-critico .node-ring, .status-parado .node-ring{
+    border-color: color-mix(in srgb, currentColor 60%, transparent);
+    animation: ring-pulse 1.5s ease-in-out infinite;
+  }
+  .status-critico .node-ring{ color: var(--crit); }
+  .status-parado .node-ring{ color: var(--down); }
+  @keyframes ring-pulse{
+    0%,100%{ transform: scale(1); opacity:.9; }
+    50%{ transform: scale(1.18); opacity:.15; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .pulse-dot, .node-ring{ animation: none; }
+  }
+
+  /* ---- detail panel (um posto por vez, oculto até o clique) ---- */
+  .node.is-selected{ box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--accent); }
+
+  .detail-panel{
+    margin-top:16px; background: var(--surface-2); border:1px solid var(--border); border-radius:12px;
+    padding:16px 18px; display:flex; flex-direction:column; gap:12px;
+  }
+  .detail-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+  .detail-head .posto{ font-family: var(--font-display); font-weight:700; font-size:16px; }
+  .pill{
+    font-size:11px; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap;
+    color:#0B0E13;
+  }
+  .pill.status-normal{ background: var(--ok); }
+  .pill.status-atencao{ background: var(--warn); }
+  .pill.status-critico{ background: var(--crit); }
+  .pill.status-parado{ background: var(--down); }
+  .detail-close{
+    background:none; border:1px solid var(--border); color: var(--muted); cursor:pointer;
+    font-family: var(--font-body); font-size:12px; font-weight:600; padding:5px 10px; border-radius:7px;
+  }
+  .detail-close:hover{ color: var(--fg); border-color: var(--accent); }
+
+  .detail-grid{ display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:14px; }
+  .detail-item{ display:flex; flex-direction:column; gap:3px; min-width:0; }
+  .detail-item .dl{ font-size:11px; color: var(--muted); text-transform:uppercase; letter-spacing:.05em; }
+  .detail-item .dv{ font-size:14.5px; font-weight:600; }
+  .detail-item.highlight .dv{ color: var(--accent); font-weight:700; }
+  .detail-updated{ font-size:11.5px; color: var(--muted); border-top:1px dashed var(--border); padding-top:10px; }
+
+  /* ---- legend + controls ---- */
+  .foot{ display:flex; gap:16px; flex-wrap:wrap; align-items:center; justify-content:space-between; }
+  .legend{ display:flex; gap:14px; flex-wrap:wrap; }
+  .legend-item{ display:flex; align-items:center; gap:6px; font-size:12.5px; color: var(--muted); }
+  .legend-item .dot{ width:10px; height:10px; border-radius:50%; }
+
+  .controls{ display:flex; align-items:center; gap:10px; }
+  .btn{
+    font-family: var(--font-body); font-size:12.5px; font-weight:600; cursor:pointer;
+    border-radius:8px; padding:8px 12px; border:1px solid var(--border);
+    background: var(--surface); color: var(--fg);
+  }
+  .btn:hover{ border-color: var(--accent); }
+  .btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .btn.primary{ background: var(--accent); border-color: var(--accent); color:#fff; }
+
+  .note{ font-size:12px; color: var(--muted); line-height:1.5; }
+
+  .select-wrap.locked::after{ display:none; }
+  .select-wrap.locked .run-select{ padding-right:0; opacity:1; color: var(--fg); cursor:default; }
+  .run-input[readonly]{ border-bottom-color: transparent; cursor:default; }
+  .conn-banner{
+    background: color-mix(in srgb, var(--down) 14%, var(--surface)); border:1px solid var(--down);
+    color: var(--fg); border-radius:10px; padding:10px 14px; font-size:13px; font-weight:600;
+  }
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">PC</div>
+      <div>
+        <h1>Painel de Chamada <span class="proto-badge" id="badge">protótipo · dados simulados</span></h1>
+        <p class="subtitle">Visualização para a Logística</p>
+      </div>
+    </div>
+    <div class="status-clock">
+      <span class="pulse-dot" id="pulseDot" aria-hidden="true"></span>
+      <span id="clockLabel">Última leitura</span>
+      <span id="clock" class="mono">--:--:--</span>
+    </div>
+  </div>
+
+  <div class="run-context">
+    <div class="run-field">
+      <span class="run-label">Linha</span>
+      <span class="run-value" id="linhaValue">—</span>
+    </div>
+    <div class="run-divider"></div>
+    <div class="run-field">
+      <span class="run-label">Modelo em produção</span>
+      <span class="select-wrap"><select class="run-select" id="modeloSelect"></select></span>
+    </div>
+    <div class="run-divider"></div>
+    <div class="run-field">
+      <span class="run-label">Versão</span>
+      <span class="select-wrap"><select class="run-select" id="versaoSelect"></select></span>
+    </div>
+    <div class="run-divider"></div>
+    <div class="run-field">
+      <span class="run-label">Nº da Ordem</span>
+      <input type="text" inputmode="numeric" class="run-input" id="ordemInput" placeholder="0000000000" >
+    </div>
+    <div class="run-divider"></div>
+    <div class="run-field">
+      <span class="run-label">Qtd. da Ordem</span>
+      <input type="number" min="0" class="run-input" id="qtdOrdemInput" placeholder="0" >
+    </div>
+  </div>
+
+  <div class="conn-banner" id="connBanner" hidden></div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <span class="panel-title">LAYOUT DA LINHA</span>
+      <span class="panel-hint">clique em um posto para ver o detalhe</span>
+    </div>
+    <div class="line-scroll">
+      <div class="line-track" id="lineTrack"></div>
+    </div>
+    <div class="detail-panel" id="detailPanel" hidden></div>
+  </div>
+
+  <div class="panel foot">
+    <div class="legend">
+      <span class="legend-item"><span class="dot status-normal" style="background:var(--ok)"></span>Normal</span>
+      <span class="legend-item"><span class="dot" style="background:var(--warn)"></span>Atenção</span>
+      <span class="legend-item"><span class="dot" style="background:var(--crit)"></span>Crítico</span>
+      <span class="legend-item"><span class="dot" style="background:var(--down)"></span>Parado</span>
+    </div>
+    <div class="controls" id="controls">
+      <button class="btn" id="resetBtn" type="button">Reiniciar demo</button>
+      <button class="btn primary" id="simBtn" type="button">Pausar simulação</button>
+    </div>
+  </div>
+
+  <p class="note" id="noteText">Este painel usa postos e itens fictícios apenas para validar layout e cores. Modelo, versão, nº da ordem e quantidade são preenchidos manualmente por quem está na linha (operador ou WIP da logística) — é assim mesmo em produção, já que hoje ninguém mais tem essa informação em tempo real. Clique em um posto para abrir o detalhe; clique de novo para fechar.</p>
+
+</div>
+<script>
+(function(){
+  // =====================================================================
+  //  CONFIGURAÇÃO  — é aqui que você cola a URL do Power Automate
+  // =====================================================================
+  var CONFIG = {
+    // Cole entre as aspas a "URL do HTTP POST" do fluxo API_LerPainel.
+    // Deixe vazio ('') para abrir em modo demonstração (dados fictícios).
+    API_URL: 'https://defaultd2007bef127d459197ac10d72fe280.31.environment.api.powerplatform.com:443/powerautomate/automations/direct/cu/14/workflows/c7f20f562789498b89676fe2b0766310/triggers/manual/paths/invoke?api-version=1&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=zAOM0xZWdgXJqhA2Rel9vJCr1u5qmi3iVOF0C4ywMdI',
+    // De quantos em quantos milissegundos o painel pergunta ao SharePoint.
+    POLL_MS: 4000,
+    // Se ficar tanto tempo sem resposta, o painel avisa "sem conexão".
+    STALE_MS: 20000
+  };
+
+  var LIVE = !!CONFIG.API_URL;
+
+  var STATUSES = ['normal','atencao','critico','parado'];
+  var LABELS = { normal:'Normal', atencao:'Atenção', critico:'Crítico', parado:'Parado' };
+
+  var MODELO_VERSOES = {
+    'NE09F': ['3A','3B','3C','3D','3E'],
+    'NE09R': ['3A','3B','3E'],
+    'NE12F': ['3A','3B','3C','3D','3E'],
+    'NE12R': ['3E','3N','3T'],
+    'NE18F': ['3A','3B'],
+    'NE18R': ['3A','3B'],
+    'NE24F': ['3A'],
+    'NE24R': ['2N']
+  };
+
+  var posts = [];
+  var contexto = { linha:'—', modelo:'—', versao:'—', numeroOrdem:'', qtdOrdem:'' };
+  var lastOkAt = 0;          // quando a última leitura deu certo
+  var lastError = '';        // texto do último erro, se houver
+  var selectedId = null;
+
+  var lineTrack = document.getElementById('lineTrack');
+  var detailPanel = document.getElementById('detailPanel');
+  var summaryEl = document.getElementById('summary');
+  var clockEl = document.getElementById('clock');
+  var clockLabel = document.getElementById('clockLabel');
+  var pulseDot = document.getElementById('pulseDot');
+  var badgeEl = document.getElementById('badge');
+  var noteEl = document.getElementById('noteText');
+  var bannerEl = document.getElementById('connBanner');
+  var simBtn = document.getElementById('simBtn');
+  var resetBtn = document.getElementById('resetBtn');
+  var controlsEl = document.getElementById('controls');
+  var linhaValueEl = document.getElementById('linhaValue');
+  var modeloSelect = document.getElementById('modeloSelect');
+  var versaoSelect = document.getElementById('versaoSelect');
+  var ordemInput = document.getElementById('ordemInput');
+  var qtdOrdemInput = document.getElementById('qtdOrdemInput');
+
+  // ---------- utilidades ----------
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c];
+    });
+  }
+  function clean(s){ return String(s == null ? '' : s).trim(); }
+
+  // "Atenção", "ATENCAO", " crítico " → 'atencao', 'critico' ...
+  function normStatus(s){
+    var t = clean(s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+    return STATUSES.indexOf(t) >= 0 ? t : 'normal';
+  }
+  // "L1T1OP001" → "OP001"
+  function shortCode(posto){
+    var m = /OP\d+$/i.exec(posto);
+    return m ? m[0].toUpperCase() : posto.slice(-5);
+  }
+  function relTime(ts){
+    var diff = Math.max(0, Math.floor((Date.now() - ts)/1000));
+    if (diff < 60) return 'há ' + diff + 's';
+    var m = Math.floor(diff/60);
+    if (m < 60) return 'há ' + m + ' min';
+    var h = Math.floor(m/60);
+    return 'há ' + h + 'h';
+  }
+  function pad(n){ return n < 10 ? '0' + n : '' + n; }
+  function hhmmss(d){ return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()); }
+
+  // ---------- contexto (linha / modelo / versão / ordem / quantidade) ----------
+  function setSelect(sel, value){
+    sel.innerHTML = '';
+    var opt = document.createElement('option');
+    opt.value = value; opt.textContent = value || '—';
+    sel.appendChild(opt);
+    sel.value = value;
+  }
+
+  function applyContextoLive(){
+    linhaValueEl.textContent = contexto.linha || '—';
+    setSelect(modeloSelect, contexto.modelo || '—');
+    setSelect(versaoSelect, contexto.versao || '—');
+    // não sobrescreve se alguém estiver digitando (no monitor ninguém digita, mas por segurança)
+    if (document.activeElement !== ordemInput) ordemInput.value = contexto.numeroOrdem || '';
+    if (document.activeElement !== qtdOrdemInput) qtdOrdemInput.value = contexto.qtdOrdem || '';
+  }
+
+  function populateRunContextDemo(){
+    linhaValueEl.textContent = 'AF1';
+    Object.keys(MODELO_VERSOES).forEach(function(modelo){
+      var opt = document.createElement('option');
+      opt.value = modelo; opt.textContent = modelo;
+      modeloSelect.appendChild(opt);
+    });
+    modeloSelect.value = 'NE09F';
+    populateVersoes();
+    modeloSelect.addEventListener('change', populateVersoes);
+  }
+  function populateVersoes(){
+    versaoSelect.innerHTML = '';
+    MODELO_VERSOES[modeloSelect.value].forEach(function(v){
+      var opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      versaoSelect.appendChild(opt);
+    });
+  }
+
+  // ---------- leitura ao vivo ----------
+  function applyApiData(data){
+    var c = data && data.contexto || {};
+    contexto = {
+      linha: clean(c.linha), modelo: clean(c.modelo), versao: clean(c.versao),
+      numeroOrdem: clean(c.numeroOrdem), qtdOrdem: clean(c.qtdOrdem)
+    };
+    var lista = (data && data.postos) || [];
+    posts = lista.map(function(r){
+      var posto = clean(r.posto);
+      var t = Date.parse(r.atualizado);
+      return {
+        id: posto,
+        posto: posto,
+        code: shortCode(posto),
+        name: clean(r.descricao) || '(sem descrição)',
+        item: clean(r.codigo),
+        qty: r.qtdFechar,
+        status: normStatus(r.status),
+        updatedAt: isNaN(t) ? Date.now() : t
+      };
+    }).sort(function(a,b){ return a.posto < b.posto ? -1 : a.posto > b.posto ? 1 : 0; });
+    if (selectedId !== null && !posts.some(function(p){ return p.id === selectedId; })) selectedId = null;
+    applyContextoLive();
+  }
+
+  function poll(){
+    var ctrl = ('AbortController' in window) ? new AbortController() : null;
+    var timeout = setTimeout(function(){ if (ctrl) ctrl.abort(); }, 15000);
+    fetch(CONFIG.API_URL, { cache:'no-store', signal: ctrl ? ctrl.signal : undefined })
+      .then(function(res){
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
+      .then(function(data){
+        applyApiData(data);
+        lastOkAt = Date.now();
+        lastError = '';
+      })
+      .catch(function(err){
+        lastError = (err && err.message) ? err.message : String(err);
+      })
+      .then(function(){
+        clearTimeout(timeout);
+        render();
+        setTimeout(poll, CONFIG.POLL_MS);   // só agenda a próxima depois de terminar esta
+      });
+  }
+
+  // ---------- modo demonstração ----------
+  var demoTimer = null, demoOn = true, demoInitial = [];
+  function startDemo(){
+    posts = [
+      { id:'L1T1OP001', posto:'L1T1OP001', code:'OP001', name:'Base do Gabinete',      item:'A29837501', qty:40,  status:'normal' },
+      { id:'L1T1OP002', posto:'L1T1OP002', code:'OP002', name:'Compressor GMCC',       item:'A30165801', qty:40,  status:'normal' },
+      { id:'L1T1OP004', posto:'L1T1OP004', code:'OP004', name:'Hélice 09-12K',         item:'A30330801', qty:80,  status:'atencao' },
+      { id:'L1T1OP009', posto:'L1T1OP009', code:'OP009', name:'Gaxeta Compressor',     item:'A30364101', qty:120, status:'normal' },
+      { id:'L1T1OP019', posto:'L1T1OP019', code:'OP019', name:'Manta Sup. Compressor', item:'A30330001', qty:40,  status:'critico' },
+      { id:'L1T1OP043', posto:'L1T1OP043', code:'OP043', name:'Caixa Emb. 09-12K',     item:'A29982401', qty:60,  status:'normal' }
+    ];
+    posts.forEach(function(p){ p.updatedAt = Date.now() - Math.floor(Math.random()*90000); });
+    demoInitial = posts.map(function(p){ return { id:p.id, status:p.status }; });
+    lastOkAt = Date.now();
+    populateRunContextDemo();
+    runDemoTimer();
+    simBtn.addEventListener('click', function(){
+      demoOn = !demoOn;
+      simBtn.textContent = demoOn ? 'Pausar simulação' : 'Retomar simulação';
+      if (demoOn) runDemoTimer(); else { clearInterval(demoTimer); demoTimer = null; }
+    });
+    resetBtn.addEventListener('click', function(){
+      demoInitial.forEach(function(s){
+        var p = posts.find(function(x){ return x.id === s.id; });
+        p.status = s.status; p.updatedAt = Date.now();
+      });
+      render();
+    });
+  }
+  function runDemoTimer(){
+    if (demoTimer) clearInterval(demoTimer);
+    demoTimer = setInterval(function(){
+      var p = posts[Math.floor(Math.random()*posts.length)];
+      p.status = STATUSES[Math.floor(Math.random()*STATUSES.length)];
+      p.updatedAt = Date.now();
+      lastOkAt = Date.now();
+      render();
+    }, 5000);
+  }
+
+  // ---------- desenho ----------
+  function toggleDetail(id){
+    selectedId = (selectedId === id) ? null : id;
+    render();
+  }
+
+  function renderDetail(){
+    var p = selectedId === null ? null : posts.find(function(x){ return x.id === selectedId; });
+    if (!p){ detailPanel.hidden = true; detailPanel.innerHTML = ''; return; }
+    detailPanel.hidden = false;
+    detailPanel.innerHTML =
+      '<div class="detail-head">' +
+        '<span class="posto">' + esc(p.posto) + ' · ' + esc(p.name) + '</span>' +
+        '<span class="pill status-' + p.status + '">' + LABELS[p.status] + '</span>' +
+        '<button type="button" class="detail-close" id="detailCloseBtn">Fechar ✕</button>' +
+      '</div>' +
+      '<div class="detail-grid">' +
+        '<div class="detail-item"><span class="dl">Código</span><span class="dv mono">' + esc(p.item) + '</span></div>' +
+        '<div class="detail-item highlight"><span class="dl">Qtd. p/ fechar ordem</span><span class="dv mono">' + esc(p.qty) + ' un.</span></div>' +
+        '<div class="detail-item"><span class="dl">Posto</span><span class="dv mono">' + esc(p.posto) + '</span></div>' +
+      '</div>' +
+      '<div class="detail-updated mono">atualizado ' + relTime(p.updatedAt) + '</div>';
+    document.getElementById('detailCloseBtn').addEventListener('click', function(){
+      selectedId = null; render();
+    });
+  }
+
+  function render(){
+    lineTrack.innerHTML = '';
+    if (!posts.length){
+      lineTrack.innerHTML = '<p class="note">Nenhum posto cadastrado ainda na lista Status_Chamada.</p>';
+    }
+    posts.forEach(function(p, idx){
+      var wrap = document.createElement('div');
+      wrap.className = 'node-wrap';
+      var isSelected = (p.id === selectedId);
+      wrap.innerHTML =
+        '<button type="button" class="node status-' + p.status + (isSelected ? ' is-selected' : '') + '" data-id="' + esc(p.id) + '" aria-pressed="' + isSelected + '" aria-label="' + esc(p.posto + ', ' + p.name + ', status ' + LABELS[p.status]) + '">' +
+          '<span class="node-ring" aria-hidden="true"></span>' + esc(p.code) +
+        '</button>' +
+        '<div class="node-caption"><strong>' + esc(p.name) + '</strong><span class="mono">' + esc(p.item) + '</span><span class="qty-target">Meta: ' + esc(p.qty) + ' un.</span></div>';
+      lineTrack.appendChild(wrap);
+      if (idx < posts.length - 1){
+        var conn = document.createElement('div');
+        conn.className = 'connector';
+        lineTrack.appendChild(conn);
+      }
+    });
+    lineTrack.querySelectorAll('.node').forEach(function(btn){
+      btn.addEventListener('click', function(){ toggleDetail(btn.dataset.id); });
+    });
+
+    renderDetail();
+
+    var counts = { normal:0, atencao:0, critico:0, parado:0 };
+    posts.forEach(function(p){ counts[p.status]++; });
+    var chipDefs = [
+      ['normal','Normal','var(--ok)'],
+      ['atencao','Atenção','var(--warn)'],
+      ['critico','Crítico','var(--crit)'],
+      ['parado','Parado','var(--down)']
+    ];
+    summaryEl.innerHTML = chipDefs.map(function(d){
+      return '<div class="chip"><span class="dot" style="background:' + d[2] + '"></span>' +
+        '<div><div class="num mono">' + counts[d[0]] + '</div><div class="lbl">' + d[1] + '</div></div></div>';
+    }).join('');
+
+    renderConnection();
+  }
+
+  // relógio = hora da última leitura bem-sucedida; vermelho se ficou velha
+  function renderConnection(){
+    var stale = LIVE && (Date.now() - lastOkAt > CONFIG.STALE_MS);
+    clockEl.textContent = lastOkAt ? hhmmss(new Date(lastOkAt)) : '--:--:--';
+    pulseDot.style.background = stale ? 'var(--down)' : 'var(--ok)';
+    pulseDot.style.animationPlayState = stale ? 'paused' : 'running';
+    if (LIVE && stale){
+      bannerEl.hidden = false;
+      bannerEl.textContent = lastOkAt
+        ? 'Sem conexão com o SharePoint há ' + Math.floor((Date.now()-lastOkAt)/1000) + 's — os dados abaixo podem estar desatualizados. ' + (lastError ? '(' + lastError + ')' : '')
+        : 'Ainda não consegui ler o SharePoint. ' + (lastError ? '(' + lastError + ')' : 'Aguardando a primeira resposta…');
+    } else {
+      bannerEl.hidden = true;
+    }
+  }
+
+  // ---------- início ----------
+  if (LIVE){
+    badgeEl.textContent = 'ao vivo · SharePoint';
+    clockLabel.textContent = 'Última leitura';
+    controlsEl.hidden = true;
+    noteEl.textContent = 'Este painel só mostra o que a linha apontou. Linha, modelo, versão, nº da ordem e quantidade vêm do tablet da linha (preenchidos por operador ou WIP). Clique em um posto para abrir o detalhe; clique de novo para fechar.';
+    modeloSelect.disabled = true; versaoSelect.disabled = true;
+    ordemInput.readOnly = true; qtdOrdemInput.readOnly = true;
+    document.querySelectorAll('.select-wrap').forEach(function(w){ w.classList.add('locked'); });
+    ordemInput.value = ''; qtdOrdemInput.value = '';
+    render();
+    poll();
+  } else {
+    startDemo();
+    render();
+  }
+  setInterval(function(){ render(); }, 1000);   // mantém "atualizado há Xs" e o aviso de conexão em dia
+})();
+</script>
+</body>
+</html>
